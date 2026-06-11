@@ -79,11 +79,12 @@ def _temp_copy(source: Path) -> Iterator[Path]:
 
 
 def _read_table(conn: sqlite3.Connection, query: str, schema: dict) -> pl.DataFrame:
-    """执行查询并构建 Polars DataFrame。"""
-    cursor = conn.execute(query)
-    columns = [desc[0] for desc in cursor.description]
-    rows = cursor.fetchall()
-    return pl.DataFrame(rows, schema=columns, orient="row").cast(schema)
+    """用 Polars 原生 API 执行查询并构建 DataFrame。
+
+    ``schema_overrides`` 直接交给 Polars 完成类型转换，无需手动取游标 / fetchall。
+    空结果集时 Polars 也会按 schema 返回正确列类型的空表。
+    """
+    return pl.read_database(query, conn, schema_overrides=schema)
 
 
 def _read_optional(

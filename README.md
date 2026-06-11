@@ -45,15 +45,17 @@
   4.  **时间画像**：24 小时分布（折线）、周内分布（柱状，周末高亮）、每周 × 24 小时热力图、每日访问量与有效时长双轴趋势（可缩放）。
   5.  **行为模式**：单次停留时长分布（瞄一眼 vs 长读）、导航类型（链接 / 地址栏 / 联想 / 表单 …）、访问来源（直接访问 vs 页面内点击）、工作日 vs 周末日均对比、上网会话时长概况。
   6.  **搜索与下载**：高频原生搜索词 Top 30、最近下载文件列表。
+  7.  **历史明细（全量表格）**：导出**每一条**访问记录（时间、标题、网址、域名、类别、停留时长、导航类型、来源），由前端 TanStack Table 驱动，支持全局搜索、按域名 / 类别 / 导航类型 / 来源 / 日期区间筛选、任意列排序、分页与**拖拽调整列宽**。数据以「列名 + 行数组」的紧凑列式结构注入，避免逐行重复字段名。
 
 ### 4. 静态页面生成模块 (Jinja2 HTML Builder)
 
 - **模板设计**：`template.html` 文件预留 ECharts 所需的 `<div>` 图表容器和数据插槽。
 - **前端依赖引入**（全部通过 CDN，输出单文件无需本地资源）：
-  - ECharts 5：`<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>`
-  - jQuery 4：`<script src="https://cdn.jsdelivr.net/npm/jquery@4.0.0/dist/jquery.min.js"></script>`
+  - ECharts 6：`<script src="https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.min.js"></script>`
+  - jQuery 4：`<script src="https://cdn.jsdelivr.net/npm/jquery@4/dist/jquery.min.js"></script>`
   - Bootstrap 5：负责整体布局与卡片式 UI，让报告美观且自适应。
-- **数据注入**：将 Polars 处理好的结果转换为 JSON 字符串，通过 Jinja2 注入到 HTML 的 `<script>` 标签内的 JavaScript 变量中，再由 jQuery 在 `ready` 后初始化各 ECharts 实例。
+  - TanStack Table（`@tanstack/table-core@8`，以 ESM 形式按需引入）：驱动「历史明细」全量表格的筛选 / 排序 / 分页 / 列宽拖拽，由原生 JS 渲染，无需打包构建。
+- **数据注入**：将 Polars 处理好的结果转换为 JSON 字符串，通过 Jinja2 注入到 HTML 的 `<script>` 标签内的 JavaScript 变量中，再由 jQuery 在 `ready` 后初始化各 ECharts 实例；明细表数据挂到 `window.REPORT` 供下方 ES module 读取。
 
 ## 三、 安装与使用
 
@@ -87,5 +89,5 @@ src/browser_history_analyzer/
 ├── analyzer.py        # Polars 数据清洗与聚合分析
 ├── builder.py         # Jinja2 渲染 HTML 报告
 └── templates/
-    └── template.html  # jQuery 4 + Bootstrap 5 + ECharts 5 模板
+    └── template.html  # jQuery 4 + Bootstrap 5 + ECharts 6 + TanStack Table 模板
 ```

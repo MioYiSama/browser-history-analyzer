@@ -217,6 +217,81 @@
       footer {
         color: var(--muted);
       }
+      /* 历史明细表（TanStack Table） */
+      .records-toolbar .form-control,
+      .records-toolbar .form-select {
+        font-size: 0.82rem;
+      }
+      .records-wrap {
+        max-height: 640px;
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.6rem;
+      }
+      [data-bs-theme="dark"] .records-wrap {
+        border-color: #334155;
+      }
+      table.records {
+        font-size: 0.82rem;
+        margin: 0;
+        /* 固定布局：列宽由 colgroup 决定，是拖拽调宽与 ellipsis 的前提 */
+        table-layout: fixed;
+      }
+      table.records thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--panel);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-bottom: 2px solid #e2e8f0;
+        user-select: none;
+      }
+      [data-bs-theme="dark"] table.records thead th {
+        border-bottom-color: #334155;
+      }
+      table.records thead th.sortable {
+        cursor: pointer;
+      }
+      table.records thead th.sortable:hover {
+        color: var(--brand);
+      }
+      table.records td {
+        vertical-align: middle;
+        overflow: hidden;
+      }
+      table.records td.nowrap {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      table.records .ellipsis {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* 列宽拖拽手柄 */
+      table.records thead th .col-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 7px;
+        cursor: col-resize;
+        user-select: none;
+        touch-action: none;
+      }
+      table.records thead th .col-resizer:hover,
+      table.records thead th .col-resizer.resizing {
+        background: var(--brand);
+        opacity: 0.6;
+      }
+      .records-info {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -251,6 +326,7 @@
           <a class="nav-link" href="#sec-time">⏰ 时间画像</a>
           <a class="nav-link" href="#sec-behavior">🧭 行为模式</a>
           <a class="nav-link" href="#sec-search">🔍 搜索与下载</a>
+          <a class="nav-link" href="#sec-records">📜 历史明细</a>
         </nav>
       </aside>
 
@@ -486,6 +562,80 @@
         </div>
       </div>
 
+      <!-- 历史明细（全量表格） -->
+      <div id="sec-records" data-section class="section-title"><span class="bar"></span>历史明细</div>
+      <div class="row g-4">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
+            <div class="card-body">
+              <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                <h5 class="card-title mb-0">全部访问记录</h5>
+                <span id="rec-info" class="records-info"></span>
+              </div>
+
+              <div class="records-toolbar row g-2 mb-3">
+                <div class="col-12 col-md-4 col-lg-3">
+                  <input id="rec-search" type="search" class="form-control form-control-sm"
+                         placeholder="🔍 搜索标题 / 网址 / 域名" />
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                  <input id="rec-domain" type="search" class="form-control form-control-sm"
+                         placeholder="按域名筛选" />
+                </div>
+                <div class="col-6 col-md-2 col-lg-2">
+                  <select id="rec-category" class="form-select form-select-sm">
+                    <option value="">全部类别</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                  <select id="rec-trans" class="form-select form-select-sm">
+                    <option value="">全部导航类型</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-2 col-lg-1">
+                  <select id="rec-src" class="form-select form-select-sm">
+                    <option value="">全部来源</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-3 col-lg-1">
+                  <input id="rec-from" type="date" class="form-control form-control-sm" title="起始日期" />
+                </div>
+                <div class="col-6 col-md-3 col-lg-1">
+                  <input id="rec-to" type="date" class="form-control form-control-sm" title="结束日期" />
+                </div>
+              </div>
+
+              <div class="records-wrap">
+                <table class="table table-sm table-hover records mb-0">
+                  <colgroup id="rec-cols"></colgroup>
+                  <thead id="rec-head"></thead>
+                  <tbody id="rec-body"></tbody>
+                </table>
+              </div>
+
+              <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <button id="rec-first" class="btn btn-sm btn-outline-secondary" type="button">«</button>
+                  <button id="rec-prev" class="btn btn-sm btn-outline-secondary" type="button">‹</button>
+                  <span id="rec-page" class="records-info"></span>
+                  <button id="rec-next" class="btn btn-sm btn-outline-secondary" type="button">›</button>
+                  <button id="rec-last" class="btn btn-sm btn-outline-secondary" type="button">»</button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <select id="rec-size" class="form-select form-select-sm" style="width: auto">
+                    <option value="25">25 行/页</option>
+                    <option value="50" selected>50 行/页</option>
+                    <option value="100">100 行/页</option>
+                    <option value="200">200 行/页</option>
+                  </select>
+                  <button id="rec-reset" class="btn btn-sm btn-outline-secondary" type="button">重置筛选</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <footer class="text-center mt-5 small">
         由 browser-history-analyzer 生成 · 数据均在本地处理，不会上传。
       </footer>
@@ -495,6 +645,8 @@
     <script>
       // 由 Jinja2 注入的分析数据
       const REPORT = {{ chart_data | safe }};
+      // 暴露给下方的 ES module（TanStack Table）使用
+      window.REPORT = REPORT;
       const PALETTE = [
         "#4f46e5", "#06b6d4", "#7c3aed", "#10b981", "#f59e0b",
         "#ef4444", "#ec4899", "#14b8a6", "#8b5cf6", "#0ea5e9", "#f97316",
@@ -844,6 +996,315 @@
           setActive(sections[0].id);
         }
       });
+    </script>
+
+    <!-- 历史明细表：TanStack Table (table-core) 驱动，原生渲染 -->
+    <script type="module">
+      import {
+        createTable,
+        getCoreRowModel,
+        getFilteredRowModel,
+        getSortedRowModel,
+        getPaginationRowModel,
+      } from "https://cdn.jsdelivr.net/npm/@tanstack/table-core@8/+esm";
+
+      const R = window.REPORT && window.REPORT.records;
+      const head = document.getElementById("rec-head");
+      const body = document.getElementById("rec-body");
+      const cols = document.getElementById("rec-cols");
+      const tableEl = cols && cols.closest("table");
+
+      if (!R || !R.rows || !R.rows.length) {
+        if (body)
+          body.innerHTML =
+            '<tr><td class="text-muted text-center py-4">无历史记录</td></tr>';
+      } else {
+        const { fields, rows } = R;
+        // 列式数据还原为对象数组
+        const data = rows.map((row) => {
+          const o = {};
+          for (let i = 0; i < fields.length; i++) o[fields[i]] = row[i];
+          return o;
+        });
+
+        const esc = (s) =>
+          String(s == null ? "" : s)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+
+        const HEADERS = {
+          ts: "时间",
+          title: "标题",
+          url: "网址",
+          domain: "域名",
+          category: "类别",
+          dur: "停留(秒)",
+          trans: "导航类型",
+          src: "来源",
+        };
+
+        // 时间按 YYYY-MM-DD 前缀做字典序区间过滤
+        const dateRangeFilter = (r, id, val) => {
+          const d = String(r.getValue(id)).slice(0, 10);
+          const [from, to] = val || [];
+          if (from && d < from) return false;
+          if (to && d > to) return false;
+          return true;
+        };
+        const equals = (r, id, val) => r.getValue(id) === val;
+        const includes = (r, id, val) =>
+          String(r.getValue(id)).toLowerCase().includes(String(val).toLowerCase());
+
+        const columns = [
+          { accessorKey: "ts", size: 150, enableGlobalFilter: false, filterFn: dateRangeFilter },
+          { accessorKey: "title", size: 260 }, // 唯一参与全局搜索的列
+          { accessorKey: "url", size: 280, enableGlobalFilter: false },
+          { accessorKey: "domain", size: 150, enableGlobalFilter: false, filterFn: includes },
+          { accessorKey: "category", size: 90, enableGlobalFilter: false, filterFn: equals },
+          { accessorKey: "dur", size: 80, enableGlobalFilter: false },
+          { accessorKey: "trans", size: 110, enableGlobalFilter: false, filterFn: equals },
+          { accessorKey: "src", size: 110, enableGlobalFilter: false, filterFn: equals },
+        ];
+
+        // 全局搜索：跨 标题 / 网址 / 域名
+        const globalFilterFn = (r, _id, value) => {
+          const v = String(value).toLowerCase();
+          const o = r.original;
+          return (
+            (o.title || "").toLowerCase().includes(v) ||
+            (o.url || "").toLowerCase().includes(v) ||
+            (o.domain || "").toLowerCase().includes(v)
+          );
+        };
+
+        // 完整初始 state：table-core 在受控模式下不会自动补全各 feature 的
+        // 默认子状态，缺少 columnPinning / columnVisibility 等会导致
+        // getHeaderGroups 读取 undefined.left 报错。
+        let state = {
+          sorting: [{ id: "ts", desc: true }],
+          columnFilters: [],
+          globalFilter: "",
+          pagination: { pageIndex: 0, pageSize: 50 },
+          columnVisibility: {},
+          columnOrder: [],
+          columnPinning: { left: [], right: [] },
+          rowSelection: {},
+          rowPinning: { top: [], bottom: [] },
+          expanded: {},
+          grouping: [],
+          columnSizing: {},
+          columnSizingInfo: {
+            startOffset: null,
+            startSize: null,
+            deltaOffset: null,
+            deltaPercentage: null,
+            isResizingColumn: false,
+            columnSizingStart: [],
+          },
+        };
+
+        const table = createTable({
+          data,
+          columns,
+          state,
+          globalFilterFn,
+          enableSortingRemoval: false,
+          enableColumnResizing: true,
+          columnResizeMode: "onChange",
+          defaultColumn: { minSize: 60, maxSize: 800 },
+          onStateChange: (updater) => {
+            state = typeof updater === "function" ? updater(state) : updater;
+            table.setOptions((prev) => ({ ...prev, state }));
+            render();
+          },
+          getCoreRowModel: getCoreRowModel(),
+          getFilteredRowModel: getFilteredRowModel(),
+          getSortedRowModel: getSortedRowModel(),
+          getPaginationRowModel: getPaginationRowModel(),
+          renderFallbackValue: "",
+        });
+
+        // 用真实数据填充下拉选项
+        const uniq = (key) => [...new Set(data.map((d) => d[key]))].sort();
+        const fillSelect = (selId, vals) => {
+          const sel = document.getElementById(selId);
+          vals.forEach((v) => {
+            const opt = document.createElement("option");
+            opt.value = v;
+            opt.textContent = v;
+            sel.appendChild(opt);
+          });
+        };
+        fillSelect("rec-category", uniq("category"));
+        fillSelect("rec-trans", uniq("trans"));
+        fillSelect("rec-src", uniq("src"));
+
+        const $ = (id) => document.getElementById(id);
+
+        function render() {
+          const headers = table.getHeaderGroups()[0].headers;
+
+          // 列宽：colgroup 决定每列宽度，表宽为各列之和（超出即横向滚动）
+          cols.innerHTML = headers
+            .map((h) => `<col style="width:${h.getSize()}px" />`)
+            .join("");
+          tableEl.style.width = table.getTotalSize() + "px";
+
+          // 表头（排序指示 + 拖拽手柄）
+          head.innerHTML =
+            "<tr>" +
+            headers
+              .map((h) => {
+                const col = h.column;
+                const sorted = col.getIsSorted();
+                const arrow = sorted === "asc" ? " ▲" : sorted === "desc" ? " ▼" : "";
+                const cls =
+                  (col.getCanSort() ? "sortable " : "") +
+                  (col.id === "dur" ? "text-end" : "");
+                return (
+                  `<th data-col="${col.id}" style="width:${h.getSize()}px" class="${cls.trim()}">` +
+                  `${HEADERS[col.id]}${arrow}` +
+                  `<div class="col-resizer" data-col="${col.id}"></div></th>`
+                );
+              })
+              .join("") +
+            "</tr>";
+
+          // 排序：点击表头（手柄区域除外）
+          head.querySelectorAll("th.sortable").forEach((th) => {
+            th.addEventListener("click", (e) => {
+              if (e.target.classList.contains("col-resizer")) return;
+              table.getColumn(th.dataset.col).toggleSorting();
+            });
+          });
+
+          // 拖拽调宽：复用 table-core 的 resize handler
+          const resizingId = table.getState().columnSizingInfo.isResizingColumn;
+          head.querySelectorAll(".col-resizer").forEach((rz) => {
+            const h = headers.find((x) => x.column.id === rz.dataset.col);
+            const handler = h.getResizeHandler();
+            // stopPropagation 避免拖拽被误判为点击排序
+            rz.addEventListener("mousedown", (e) => {
+              e.stopPropagation();
+              handler(e);
+            });
+            rz.addEventListener(
+              "touchstart",
+              (e) => {
+                e.stopPropagation();
+                handler(e);
+              },
+              { passive: false }
+            );
+            rz.addEventListener("click", (e) => e.stopPropagation());
+            if (resizingId === rz.dataset.col) rz.classList.add("resizing");
+          });
+
+          // 表体（仅渲染当前页）
+          const pageRows = table.getRowModel().rows;
+          if (!pageRows.length) {
+            body.innerHTML =
+              '<tr><td colspan="8" class="text-muted text-center py-4">没有符合条件的记录</td></tr>';
+          } else {
+            body.innerHTML = pageRows
+              .map((r) => {
+                const o = r.original;
+                const title = o.title
+                  ? `<span class="ellipsis" title="${esc(o.title)}">${esc(o.title)}</span>`
+                  : '<span class="text-muted">(无标题)</span>';
+                return (
+                  "<tr>" +
+                  `<td class="nowrap text-muted">${esc(o.ts)}</td>` +
+                  `<td>${title}</td>` +
+                  `<td><a class="ellipsis" href="${esc(o.url)}" target="_blank" rel="noopener" title="${esc(o.url)}">${esc(o.url)}</a></td>` +
+                  `<td class="nowrap">${esc(o.domain)}</td>` +
+                  `<td><span class="badge text-bg-light">${esc(o.category)}</span></td>` +
+                  `<td class="text-end">${o.dur}</td>` +
+                  `<td class="nowrap">${esc(o.trans)}</td>` +
+                  `<td class="nowrap">${esc(o.src)}</td>` +
+                  "</tr>"
+                );
+              })
+              .join("");
+          }
+
+          // 统计信息与分页状态
+          const total = data.length;
+          const filtered = table.getFilteredRowModel().rows.length;
+          const pi = table.getState().pagination.pageIndex;
+          const pc = table.getPageCount();
+          $("rec-info").textContent = `共 ${total.toLocaleString()} 条 · 筛选后 ${filtered.toLocaleString()} 条`;
+          $("rec-page").textContent = `第 ${pc ? pi + 1 : 0} / ${pc} 页`;
+          const noPrev = !table.getCanPreviousPage();
+          const noNext = !table.getCanNextPage();
+          $("rec-first").disabled = noPrev;
+          $("rec-prev").disabled = noPrev;
+          $("rec-next").disabled = noNext;
+          $("rec-last").disabled = noNext;
+        }
+
+        // ---- 控件事件 ----
+        let dateFrom = "";
+        let dateTo = "";
+        const applyDate = () =>
+          table
+            .getColumn("ts")
+            .setFilterValue(dateFrom || dateTo ? [dateFrom, dateTo] : undefined);
+
+        $("rec-search").addEventListener("input", (e) =>
+          table.setGlobalFilter(e.target.value)
+        );
+        $("rec-domain").addEventListener("input", (e) =>
+          table.getColumn("domain").setFilterValue(e.target.value || undefined)
+        );
+        $("rec-category").addEventListener("change", (e) =>
+          table.getColumn("category").setFilterValue(e.target.value || undefined)
+        );
+        $("rec-trans").addEventListener("change", (e) =>
+          table.getColumn("trans").setFilterValue(e.target.value || undefined)
+        );
+        $("rec-src").addEventListener("change", (e) =>
+          table.getColumn("src").setFilterValue(e.target.value || undefined)
+        );
+        $("rec-from").addEventListener("change", (e) => {
+          dateFrom = e.target.value;
+          applyDate();
+        });
+        $("rec-to").addEventListener("change", (e) => {
+          dateTo = e.target.value;
+          applyDate();
+        });
+        $("rec-size").addEventListener("change", (e) =>
+          table.setPageSize(Number(e.target.value))
+        );
+        $("rec-first").addEventListener("click", () => table.setPageIndex(0));
+        $("rec-prev").addEventListener("click", () => table.previousPage());
+        $("rec-next").addEventListener("click", () => table.nextPage());
+        $("rec-last").addEventListener("click", () =>
+          table.setPageIndex(table.getPageCount() - 1)
+        );
+        $("rec-reset").addEventListener("click", () => {
+          dateFrom = "";
+          dateTo = "";
+          [
+            "rec-search",
+            "rec-domain",
+            "rec-category",
+            "rec-trans",
+            "rec-src",
+            "rec-from",
+            "rec-to",
+          ].forEach((id) => ($(id).value = ""));
+          table.resetColumnFilters();
+          table.setGlobalFilter("");
+          table.resetColumnSizing();
+          table.setPageIndex(0);
+        });
+
+        render();
+      }
     </script>
   </body>
 </html>

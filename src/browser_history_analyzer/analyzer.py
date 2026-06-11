@@ -416,6 +416,36 @@ def _weekday_weekend(events: pl.DataFrame) -> dict:
     return out
 
 
+def _records(events: pl.DataFrame) -> dict:
+    """全量访问明细，供前端 TanStack Table 做展示 / 筛选 / 排序 / 搜索。
+
+    以「列名 + 行数组」的紧凑列式结构输出（避免每行重复字段名），
+    前端再映射回对象。时间用本地墙钟字符串，按字典序即等价于时间序，
+    便于客户端排序与按日期区间过滤。
+    """
+    fields = ["ts", "title", "url", "domain", "category", "dur", "trans", "src"]
+    if events.height == 0:
+        return {"fields": fields, "rows": []}
+
+    df = events.select(
+        pl.col("ts").dt.strftime("%Y-%m-%d %H:%M:%S").alias("ts"),
+        pl.col("title").fill_null("").alias("title"),
+        pl.col("url"),
+        pl.col("domain"),
+        pl.col("category"),
+        pl.col("dur_s").round(0).cast(pl.Int64).alias("dur"),
+        pl.col("trans_core")
+        .replace_strict(_TRANSITION_NAMES, default="其他", return_dtype=pl.Utf8)
+        .alias("trans"),
+        pl.when(pl.col("from_visit") == 0)
+        .then(pl.lit("直接访问"))
+        .otherwise(pl.lit("页面内点击"))
+        .alias("src"),
+    ).sort("ts", descending=True)
+
+    return {"fields": fields, "rows": df.rows()}
+
+
 def _downloads_summary(downloads: pl.DataFrame, limit: int = 15) -> dict:
     """下载概况：总数、总大小，以及最近的几条记录。"""
     if downloads.height == 0:
@@ -484,5 +514,6 @@ def analyze(
         "sessions": _sessions(events),
         "weekday_weekend": _weekday_weekend(events),
         "downloads": _downloads_summary(downloads),
+        "records": _records(events),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }

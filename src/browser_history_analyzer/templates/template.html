@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chrome 浏览历史分析报告</title>
+
+    <!-- Bootstrap 5 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- jQuery 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@4/dist/jquery.min.js"></script>
+    <!-- ECharts 5 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #ffffff;
+        --ink: #1e293b;
+        --muted: #64748b;
+        --brand: #4f46e5;
+        --brand2: #06b6d4;
+      }
+      body {
+        background: #eef2f7;
+        color: var(--ink);
+      }
+      .hero {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 45%, #06b6d4 100%);
+        color: #fff;
+      }
+      .hero .badge-soft {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        font-weight: 500;
+      }
+      .stat-card,
+      .chart-card {
+        border: none;
+        border-radius: 1rem;
+        background: var(--panel);
+      }
+      .stat-card .stat-value {
+        font-size: 1.9rem;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      .stat-card .stat-label {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .stat-card .stat-sub {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .section-title {
+        font-weight: 700;
+        margin: 1.75rem 0 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .section-title .bar {
+        width: 4px;
+        height: 1.1rem;
+        border-radius: 4px;
+        background: linear-gradient(180deg, var(--brand), var(--brand2));
+      }
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+      .chart {
+        width: 100%;
+        height: 340px;
+      }
+      .chart-tall {
+        height: 460px;
+      }
+      .chart-sm {
+        height: 280px;
+      }
+      .term-list {
+        max-height: 340px;
+        overflow-y: auto;
+      }
+      .term-list .term {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0.1rem;
+        border-bottom: 1px dashed #e2e8f0;
+        font-size: 0.9rem;
+      }
+      .term-list .term .cnt {
+        color: var(--brand);
+        font-weight: 600;
+      }
+      .dl-table td {
+        font-size: 0.85rem;
+        vertical-align: middle;
+      }
+      footer {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero py-5 mb-4 shadow">
+      <div class="container">
+        <h1 class="display-6 fw-bold mb-2">🚀 Chrome 浏览历史分析报告</h1>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <span class="badge badge-soft rounded-pill px-3 py-2">
+            📅 {{ report.overview.date_start }} → {{ report.overview.date_end }}
+          </span>
+          <span class="badge badge-soft rounded-pill px-3 py-2">
+            🗓️ 共 {{ report.overview.active_days }} 个活跃日
+          </span>
+          <span class="badge badge-soft rounded-pill px-3 py-2">
+            ⏱️ 生成于 {{ report.generated_at }}
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container pb-5">
+      <!-- KPI 总览 -->
+      <section class="row g-3">
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">总访问记录</div>
+              <div class="stat-value text-primary" data-kpi="total_visits">0</div>
+              <div class="stat-sub">日均 {{ report.overview.avg_visits_per_day }} 次</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">有效使用时长</div>
+              <div class="stat-value text-success" data-kpi="engaged_hours">0</div>
+              <div class="stat-sub">日均 {{ report.overview.avg_hours_per_day }} 时（封顶30分）</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">独立网址</div>
+              <div class="stat-value text-info" data-kpi="total_urls">0</div>
+              <div class="stat-sub">{{ report.overview.total_domains }} 个域名</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">上网会话</div>
+              <div class="stat-value text-warning" data-kpi="session_count">0</div>
+              <div class="stat-sub">中位 {{ report.sessions.median_min }} 分钟</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">搜索次数</div>
+              <div class="stat-value" style="color: #7c3aed" data-kpi="search_count">0</div>
+              <div class="stat-sub">原生搜索词</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center">
+              <div class="stat-label">下载文件</div>
+              <div class="stat-value text-danger" data-kpi="download_count">0</div>
+              <div class="stat-sub">共 {{ report.downloads.total_mb }} MB</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 内容类别 -->
+      <div class="section-title"><span class="bar"></span>内容类别画像</div>
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">各类别有效时长占比</h5>
+              <div id="chart-cat-pie" class="chart"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">各类别 · 访问次数 vs 有效时长</h5>
+              <div id="chart-cat-bar" class="chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 域名 -->
+      <div class="section-title"><span class="bar"></span>网站排行</div>
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card chart-card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">Top 域名（按访问次数）</h5>
+              <div id="chart-domains" class="chart chart-tall"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card chart-card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">Top 域名（按有效时长）</h5>
+              <div id="chart-domains-hours" class="chart chart-tall"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 时间画像 -->
+      <div class="section-title"><span class="bar"></span>时间画像</div>
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">24 小时访问分布</h5>
+              <div id="chart-hourly" class="chart"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">周内分布</h5>
+              <div id="chart-weekday" class="chart"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">每周 × 24 小时访问热力图</h5>
+              <div id="chart-heatmap" class="chart chart-tall"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">每日访问量与有效时长趋势</h5>
+              <div id="chart-trend" class="chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 行为模式 -->
+      <div class="section-title"><span class="bar"></span>行为模式</div>
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">单次停留时长分布</h5>
+              <div id="chart-duration" class="chart chart-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">导航类型</h5>
+              <div id="chart-transition" class="chart chart-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">访问来源</h5>
+              <div id="chart-nav" class="chart chart-sm"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 工作日 vs 周末 + 会话 -->
+      <div class="row g-4 mt-0">
+        <div class="col-lg-6">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">工作日 vs 周末（日均）</h5>
+              <div id="chart-ww" class="chart chart-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">会话时长概况</h5>
+              <div class="row g-3 mt-1 text-center">
+                <div class="col-6 col-md-3">
+                  <div class="stat-value text-warning">{{ report.sessions.count }}</div>
+                  <div class="stat-label">会话总数</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="stat-value text-primary">{{ report.sessions.avg_min }}</div>
+                  <div class="stat-label">平均时长(分)</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="stat-value text-info">{{ report.sessions.median_min }}</div>
+                  <div class="stat-label">中位时长(分)</div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="stat-value text-success">{{ report.sessions.max_min }}</div>
+                  <div class="stat-label">最长(分)</div>
+                </div>
+              </div>
+              <p class="text-muted small mt-3 mb-0">
+                以 30 分钟无活动为界切分上网会话。中位时长越长，说明越偏「深度沉浸」型使用。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 搜索词 + 下载 -->
+      <div class="section-title"><span class="bar"></span>搜索与下载</div>
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">高频搜索词 Top 30</h5>
+              <div id="chart-search" class="chart chart-tall"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card chart-card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title">最近下载</h5>
+              <div class="table-responsive term-list">
+                <table class="table table-sm dl-table mb-0">
+                  <tbody id="dl-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="text-center mt-5 small">
+        由 browser-history-analyzer 生成 · 数据均在本地处理，不会上传。
+      </footer>
+    </main>
+
+    <script>
+      // 由 Jinja2 注入的分析数据
+      const REPORT = {{ chart_data | safe }};
+      const PALETTE = [
+        "#4f46e5", "#06b6d4", "#7c3aed", "#10b981", "#f59e0b",
+        "#ef4444", "#ec4899", "#14b8a6", "#8b5cf6", "#0ea5e9", "#f97316",
+      ];
+
+      function fmt(n) {
+        return n.toLocaleString("en-US");
+      }
+
+      $(function () {
+        // ---- KPI 数字滚动 ----
+        $("[data-kpi]").each(function () {
+          const key = $(this).data("kpi");
+          const val =
+            key === "session_count"
+              ? REPORT.sessions.count
+              : REPORT.overview[key];
+          $(this).text(fmt(val));
+        });
+
+        const charts = [];
+        const init = (id) => {
+          const el = document.getElementById(id);
+          if (!el) return null;
+          const c = echarts.init(el);
+          charts.push(c);
+          return c;
+        };
+        const baseGrid = { left: 8, right: 24, bottom: 8, top: 24, containLabel: true };
+
+        // ---- 类别饼图（按有效时长）----
+        const cat = REPORT.categories;
+        init("chart-cat-pie").setOption({
+          tooltip: { trigger: "item", formatter: "{b}: {c} 时 ({d}%)" },
+          legend: { type: "scroll", bottom: 0, textStyle: { fontSize: 11 } },
+          color: PALETTE,
+          series: [{
+            type: "pie",
+            radius: ["42%", "70%"],
+            center: ["50%", "44%"],
+            avoidLabelOverlap: true,
+            itemStyle: { borderColor: "#fff", borderWidth: 2 },
+            label: { formatter: "{b}\n{d}%", fontSize: 11 },
+            data: cat.names.map((n, i) => ({ name: n, value: cat.hours[i] })),
+          }],
+        });
+
+        // ---- 类别双指标柱状 ----
+        init("chart-cat-bar").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          legend: { data: ["访问次数", "有效时长(时)"], top: 0 },
+          grid: baseGrid,
+          xAxis: { type: "category", data: cat.names, axisLabel: { interval: 0, fontSize: 11 } },
+          yAxis: [
+            { type: "value", name: "次数" },
+            { type: "value", name: "时长(时)" },
+          ],
+          series: [
+            { name: "访问次数", type: "bar", data: cat.counts, itemStyle: { color: "#4f46e5", borderRadius: [4, 4, 0, 0] } },
+            { name: "有效时长(时)", type: "bar", yAxisIndex: 1, data: cat.hours, itemStyle: { color: "#06b6d4", borderRadius: [4, 4, 0, 0] } },
+          ],
+        });
+
+        // ---- Top 域名（访问次数）----
+        const dv = REPORT.top_domains;
+        init("chart-domains").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          grid: baseGrid,
+          xAxis: { type: "value" },
+          yAxis: { type: "category", data: dv.domains.slice().reverse(), axisLabel: { fontSize: 11 } },
+          series: [{
+            type: "bar",
+            data: dv.counts.slice().reverse(),
+            itemStyle: { color: "#4f46e5", borderRadius: [0, 6, 6, 0] },
+            label: { show: true, position: "right", fontSize: 10, formatter: (p) => fmt(p.value) },
+          }],
+        });
+
+        // ---- Top 域名（有效时长）----
+        const dh = REPORT.top_domains_hours;
+        init("chart-domains-hours").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v) => v + " 时" },
+          grid: baseGrid,
+          xAxis: { type: "value", name: "时" },
+          yAxis: { type: "category", data: dh.domains.slice().reverse(), axisLabel: { fontSize: 11 } },
+          series: [{
+            type: "bar",
+            data: dh.hours.slice().reverse(),
+            itemStyle: { color: "#06b6d4", borderRadius: [0, 6, 6, 0] },
+            label: { show: true, position: "right", fontSize: 10, formatter: "{c}" },
+          }],
+        });
+
+        // ---- 24 小时分布 ----
+        init("chart-hourly").setOption({
+          tooltip: { trigger: "axis" },
+          grid: baseGrid,
+          xAxis: { type: "category", boundaryGap: false, data: Array.from({ length: 24 }, (_, i) => i + "时") },
+          yAxis: { type: "value" },
+          series: [{
+            type: "line", smooth: true, areaStyle: { opacity: 0.25 },
+            data: REPORT.hourly, itemStyle: { color: "#06b6d4" },
+          }],
+        });
+
+        // ---- 周内分布 ----
+        const wd = REPORT.weekday;
+        init("chart-weekday").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          grid: baseGrid,
+          xAxis: { type: "category", data: wd.weekdays },
+          yAxis: { type: "value" },
+          series: [{
+            type: "bar",
+            data: wd.counts.map((v, i) => ({
+              value: v,
+              itemStyle: { color: i >= 5 ? "#f59e0b" : "#4f46e5", borderRadius: [4, 4, 0, 0] },
+            })),
+          }],
+        });
+
+        // ---- 热力图 ----
+        const hm = REPORT.heatmap;
+        init("chart-heatmap").setOption({
+          tooltip: { position: "top", formatter: (p) => `${hm.weekdays[p.value[1]]} ${p.value[0]}时<br/>${fmt(p.value[2])} 次` },
+          grid: { left: 8, right: 24, bottom: 36, top: 16, containLabel: true },
+          xAxis: { type: "category", data: hm.hours, splitArea: { show: true } },
+          yAxis: { type: "category", data: hm.weekdays, splitArea: { show: true } },
+          visualMap: {
+            min: 0, max: hm.max || 1, calculable: true,
+            orient: "horizontal", left: "center", bottom: 0,
+            inRange: { color: ["#e0f2fe", "#0284c7", "#1e3a8a"] },
+          },
+          series: [{
+            type: "heatmap", data: hm.data, label: { show: false },
+            emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.4)" } },
+          }],
+        });
+
+        // ---- 每日趋势（双轴）----
+        const tr = REPORT.trend;
+        init("chart-trend").setOption({
+          tooltip: { trigger: "axis" },
+          legend: { data: ["访问量", "有效时长(时)"], top: 0 },
+          grid: baseGrid,
+          xAxis: { type: "category", boundaryGap: false, data: tr.dates },
+          yAxis: [
+            { type: "value", name: "访问量" },
+            { type: "value", name: "时长(时)" },
+          ],
+          dataZoom: [{ type: "inside" }, { type: "slider", height: 16, bottom: 0 }],
+          series: [
+            { name: "访问量", type: "line", smooth: true, areaStyle: { opacity: 0.2 }, data: tr.counts, itemStyle: { color: "#4f46e5" } },
+            { name: "有效时长(时)", type: "line", smooth: true, yAxisIndex: 1, data: tr.hours, itemStyle: { color: "#f59e0b" } },
+          ],
+        });
+
+        // ---- 停留时长分布 ----
+        const du = REPORT.duration_dist;
+        init("chart-duration").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          grid: baseGrid,
+          xAxis: { type: "category", data: du.labels, axisLabel: { interval: 0, fontSize: 10 } },
+          yAxis: { type: "value" },
+          series: [{
+            type: "bar",
+            data: du.counts,
+            itemStyle: { color: "#7c3aed", borderRadius: [4, 4, 0, 0] },
+          }],
+        });
+
+        // ---- 导航类型 ----
+        init("chart-transition").setOption({
+          tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
+          color: PALETTE,
+          series: [{
+            type: "pie", radius: ["35%", "65%"], center: ["50%", "50%"],
+            itemStyle: { borderColor: "#fff", borderWidth: 2 },
+            label: { fontSize: 10 },
+            data: REPORT.transitions.items,
+          }],
+        });
+
+        // ---- 访问来源 ----
+        const ns = REPORT.nav_source;
+        init("chart-nav").setOption({
+          tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
+          color: ["#10b981", "#94a3b8"],
+          series: [{
+            type: "pie", radius: ["35%", "65%"], center: ["50%", "50%"],
+            itemStyle: { borderColor: "#fff", borderWidth: 2 },
+            label: { fontSize: 11 },
+            data: [
+              { name: "直接访问/地址栏", value: ns.direct },
+              { name: "页面内点击", value: ns.referred },
+            ],
+          }],
+        });
+
+        // ---- 工作日 vs 周末 ----
+        const ww = REPORT.weekday_weekend;
+        const wwKeys = Object.keys(ww);
+        init("chart-ww").setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          legend: { top: 0 },
+          grid: baseGrid,
+          xAxis: { type: "category", data: wwKeys },
+          yAxis: [
+            { type: "value", name: "次数/天" },
+            { type: "value", name: "时长/天" },
+          ],
+          series: [
+            { name: "日均访问", type: "bar", data: wwKeys.map((k) => ww[k].avg_visits), itemStyle: { color: "#4f46e5", borderRadius: [4, 4, 0, 0] } },
+            { name: "日均时长(时)", type: "bar", yAxisIndex: 1, data: wwKeys.map((k) => ww[k].avg_hours), itemStyle: { color: "#f59e0b", borderRadius: [4, 4, 0, 0] } },
+          ],
+        });
+
+        // ---- 搜索词 ----
+        const se = REPORT.search;
+        if (se.terms.length) {
+          const n = Math.min(se.terms.length, 30);
+          init("chart-search").setOption({
+            tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+            grid: baseGrid,
+            xAxis: { type: "value" },
+            yAxis: { type: "category", data: se.terms.slice(0, n).reverse(), axisLabel: { fontSize: 11 } },
+            series: [{
+              type: "bar",
+              data: se.counts.slice(0, n).reverse(),
+              itemStyle: {
+                borderRadius: [0, 6, 6, 0],
+                color: { type: "linear", x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: "#06b6d4" }, { offset: 1, color: "#4f46e5" }] },
+              },
+            }],
+          });
+        } else {
+          $("#chart-search").html('<div class="text-muted text-center pt-5">无搜索词记录</div>');
+        }
+
+        // ---- 下载列表 ----
+        const dls = REPORT.downloads.recent;
+        if (dls.length) {
+          const rows = dls.map((d) =>
+            `<tr><td class="text-truncate" style="max-width:240px" title="${d.name}">${d.name}</td>` +
+            `<td class="text-end text-muted">${d.mb} MB</td></tr>`
+          ).join("");
+          $("#dl-body").html(rows);
+        } else {
+          $("#dl-body").html('<tr><td class="text-muted text-center py-4">无下载记录</td></tr>');
+        }
+
+        // 自适应窗口大小
+        $(window).on("resize", () => charts.forEach((c) => c && c.resize()));
+      });
+    </script>
+  </body>
+</html>

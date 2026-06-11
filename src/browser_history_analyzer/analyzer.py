@@ -20,7 +20,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import cast
 
 import polars as pl
 
@@ -175,8 +176,8 @@ def _overview(
         "avg_hours_per_day": round(capped_hours / n_days, 1),
         "search_count": 0,  # 由 analyze() 覆盖
         "download_count": int(downloads.height),
-        "date_start": dates.min().isoformat() if events.height else "",
-        "date_end": dates.max().isoformat() if events.height else "",
+        "date_start": cast(date, dates.min()).isoformat() if events.height else "",
+        "date_end": cast(date, dates.max()).isoformat() if events.height else "",
     }
 
 
@@ -286,8 +287,8 @@ def _daily_trend(events: pl.DataFrame) -> dict:
             (pl.col("capped_s").sum() / 3600).alias("hours"),
         )
     )
-    first_day = daily.get_column("date").min()
-    last_day = daily.get_column("date").max()
+    first_day = cast(date, daily.get_column("date").min())
+    last_day = cast(date, daily.get_column("date").max())
     full = pl.DataFrame(
         {"date": pl.date_range(first_day, last_day, interval="1d", eager=True)}
     )
@@ -394,9 +395,9 @@ def _sessions(events: pl.DataFrame) -> dict:
     minutes = sess.get_column("minutes")
     return {
         "count": int(sess.height),
-        "avg_min": round(float(minutes.mean()), 1),
-        "median_min": round(float(minutes.median()), 1),
-        "max_min": round(float(minutes.max()), 1),
+        "avg_min": round(cast(float, minutes.mean()), 1),
+        "median_min": round(cast(float, minutes.median()), 1),
+        "max_min": round(cast(float, minutes.max()), 1),
     }
 
 

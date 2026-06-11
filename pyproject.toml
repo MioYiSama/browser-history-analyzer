@@ -22,4 +22,5 @@ packages = ["src/browser_history_analyzer"]
 [dependency-groups]
 dev = [
     "ruff>=0.15.16",
+    "ty>=0.0.48",
 ]

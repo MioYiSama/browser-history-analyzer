@@ -100,8 +100,10 @@ def _read_optional(
 def extract(source: Path) -> HistoryData:
     """读取 Chrome History 数据库，返回 :class:`HistoryData`。"""
     with _temp_copy(source) as tmp_path:
-        # 以只读模式打开临时副本
-        uri = f"file:{tmp_path}?mode=ro"
+        # 以只读模式打开临时副本。用 Path.as_uri() 生成合法的 file URI
+        # （正斜杠 + 百分号转义），避免 Windows 路径里的反斜杠 / 盘符 / 空格
+        # 导致 SQLite 找不到文件。
+        uri = f"{tmp_path.as_uri()}?mode=ro"
         conn = sqlite3.connect(uri, uri=True)
         try:
             urls = _read_table(

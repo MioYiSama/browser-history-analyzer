@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chrome 浏览历史分析报告</title>
 
+    <!-- 在样式加载前确定主题，避免深色模式下的白屏闪烁 (FOUC) -->
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem("bha-theme");
+          var dark = s ? s === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- Bootstrap 5 -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css"
@@ -12,8 +23,8 @@
     />
     <!-- jQuery 4 -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@4/dist/jquery.min.js"></script>
-    <!-- ECharts 5 -->
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <!-- ECharts 6 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.min.js"></script>
 
     <style>
       :root {
@@ -24,9 +35,103 @@
         --brand: #4f46e5;
         --brand2: #06b6d4;
       }
+      /* 深色模式：覆写自定义变量与表面色，Bootstrap 组件由 data-bs-theme 接管 */
+      [data-bs-theme="dark"] {
+        --panel: #1e293b;
+        --ink: #e2e8f0;
+        --muted: #94a3b8;
+      }
+      [data-bs-theme="dark"] body {
+        background: #0b1120;
+      }
+      [data-bs-theme="dark"] .term-list .term {
+        border-bottom-color: #334155;
+      }
+      [data-bs-theme="dark"] .sidebar a.nav-link:hover {
+        background: #1e293b;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
       body {
         background: #eef2f7;
         color: var(--ink);
+      }
+      /* 主题切换按钮 */
+      .theme-toggle {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        border: none;
+        border-radius: 0.75rem;
+        font-size: 1.15rem;
+        line-height: 1;
+        padding: 0.45rem 0.7rem;
+      }
+      .theme-toggle:hover {
+        background: rgba(255, 255, 255, 0.32);
+        color: #fff;
+      }
+      /* 主体布局：左侧 sticky 导航 + 右侧内容 */
+      .layout {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+        max-width: 1360px;
+        margin: 0 auto;
+        padding: 0 12px;
+      }
+      .content {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .sidebar {
+        position: sticky;
+        top: 1rem;
+        flex: 0 0 210px;
+        align-self: flex-start;
+      }
+      .sidebar .nav-card {
+        background: var(--panel);
+        border-radius: 1rem;
+        padding: 0.75rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(15, 23, 42, 0.08);
+      }
+      .sidebar .nav-card .nav-head {
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 0.25rem 0.6rem 0.5rem;
+      }
+      .sidebar a.nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.6rem;
+        border-radius: 0.6rem;
+        color: var(--ink);
+        font-size: 0.9rem;
+        font-weight: 500;
+        line-height: 1.2;
+        transition: background 0.15s, color 0.15s;
+      }
+      .sidebar a.nav-link:hover {
+        background: #eef2ff;
+        color: var(--brand);
+      }
+      .sidebar a.nav-link.active {
+        background: linear-gradient(135deg, var(--brand), var(--brand2));
+        color: #fff;
+        box-shadow: 0 0.25rem 0.6rem rgba(79, 70, 229, 0.35);
+      }
+      /* 锚点定位时为顶部留出呼吸空间 */
+      [data-section] {
+        scroll-margin-top: 1rem;
+      }
+      @media (max-width: 991.98px) {
+        .sidebar {
+          display: none;
+        }
       }
       .hero {
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 45%, #06b6d4 100%);
@@ -58,7 +163,7 @@
       }
       .section-title {
         font-weight: 700;
-        margin: 1.75rem 0 0.25rem;
+        margin: 2.5rem 0 0.5rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -72,16 +177,23 @@
       .card-title {
         font-size: 1rem;
         font-weight: 600;
+        margin-bottom: 1rem;
+      }
+      .chart-card .card-body {
+        padding: 1.25rem 1.5rem;
       }
       .chart {
         width: 100%;
-        height: 340px;
+        height: 380px;
       }
       .chart-tall {
-        height: 460px;
+        height: 540px;
       }
       .chart-sm {
-        height: 280px;
+        height: 300px;
+      }
+      .chart-trend {
+        height: 440px;
       }
       .term-list {
         max-height: 340px;
@@ -110,7 +222,10 @@
   <body>
     <header class="hero py-5 mb-4 shadow">
       <div class="container">
-        <h1 class="display-6 fw-bold mb-2">🚀 Chrome 浏览历史分析报告</h1>
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <h1 class="display-6 fw-bold mb-2">🚀 Chrome 浏览历史分析报告</h1>
+          <button id="theme-toggle" class="theme-toggle flex-shrink-0" type="button" aria-label="切换深色 / 浅色模式" title="切换深色 / 浅色模式">🌙</button>
+        </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
           <span class="badge badge-soft rounded-pill px-3 py-2">
             📅 {{ report.overview.date_start }} → {{ report.overview.date_end }}
@@ -125,9 +240,23 @@
       </div>
     </header>
 
-    <main class="container pb-5">
+    <div class="layout">
+      <!-- 左侧 sticky 快速导航 -->
+      <aside class="sidebar d-none d-lg-block">
+        <nav class="nav-card">
+          <div class="nav-head">快速导航</div>
+          <a class="nav-link" href="#sec-overview">📊 总览</a>
+          <a class="nav-link" href="#sec-categories">🏷️ 内容类别</a>
+          <a class="nav-link" href="#sec-domains">🌐 网站排行</a>
+          <a class="nav-link" href="#sec-time">⏰ 时间画像</a>
+          <a class="nav-link" href="#sec-behavior">🧭 行为模式</a>
+          <a class="nav-link" href="#sec-search">🔍 搜索与下载</a>
+        </nav>
+      </aside>
+
+      <main class="content pb-5">
       <!-- KPI 总览 -->
-      <section class="row g-3">
+      <section id="sec-overview" data-section class="row g-3">
         <div class="col-6 col-lg-2">
           <div class="card stat-card shadow-sm h-100">
             <div class="card-body text-center">
@@ -185,18 +314,18 @@
       </section>
 
       <!-- 内容类别 -->
-      <div class="section-title"><span class="bar"></span>内容类别画像</div>
+      <div id="sec-categories" data-section class="section-title"><span class="bar"></span>内容类别画像</div>
       <div class="row g-4">
-        <div class="col-lg-5">
-          <div class="card chart-card shadow-sm h-100">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">各类别有效时长占比</h5>
               <div id="chart-cat-pie" class="chart"></div>
             </div>
           </div>
         </div>
-        <div class="col-lg-7">
-          <div class="card chart-card shadow-sm h-100">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">各类别 · 访问次数 vs 有效时长</h5>
               <div id="chart-cat-bar" class="chart"></div>
@@ -206,7 +335,7 @@
       </div>
 
       <!-- 域名 -->
-      <div class="section-title"><span class="bar"></span>网站排行</div>
+      <div id="sec-domains" data-section class="section-title"><span class="bar"></span>网站排行</div>
       <div class="row g-4">
         <div class="col-lg-6">
           <div class="card chart-card shadow-sm">
@@ -227,7 +356,7 @@
       </div>
 
       <!-- 时间画像 -->
-      <div class="section-title"><span class="bar"></span>时间画像</div>
+      <div id="sec-time" data-section class="section-title"><span class="bar"></span>时间画像</div>
       <div class="row g-4">
         <div class="col-lg-7">
           <div class="card chart-card shadow-sm h-100">
@@ -257,33 +386,33 @@
           <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">每日访问量与有效时长趋势</h5>
-              <div id="chart-trend" class="chart"></div>
+              <div id="chart-trend" class="chart chart-trend"></div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 行为模式 -->
-      <div class="section-title"><span class="bar"></span>行为模式</div>
+      <div id="sec-behavior" data-section class="section-title"><span class="bar"></span>行为模式</div>
       <div class="row g-4">
-        <div class="col-lg-6">
-          <div class="card chart-card shadow-sm h-100">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">单次停留时长分布</h5>
               <div id="chart-duration" class="chart chart-sm"></div>
             </div>
           </div>
         </div>
-        <div class="col-lg-3 col-md-6">
-          <div class="card chart-card shadow-sm h-100">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">导航类型</h5>
               <div id="chart-transition" class="chart chart-sm"></div>
             </div>
           </div>
         </div>
-        <div class="col-lg-3 col-md-6">
-          <div class="card chart-card shadow-sm h-100">
+        <div class="col-12">
+          <div class="card chart-card shadow-sm">
             <div class="card-body">
               <h5 class="card-title">访问来源</h5>
               <div id="chart-nav" class="chart chart-sm"></div>
@@ -333,7 +462,7 @@
       </div>
 
       <!-- 搜索词 + 下载 -->
-      <div class="section-title"><span class="bar"></span>搜索与下载</div>
+      <div id="sec-search" data-section class="section-title"><span class="bar"></span>搜索与下载</div>
       <div class="row g-4">
         <div class="col-lg-7">
           <div class="card chart-card shadow-sm h-100">
@@ -360,7 +489,8 @@
       <footer class="text-center mt-5 small">
         由 browser-history-analyzer 生成 · 数据均在本地处理，不会上传。
       </footer>
-    </main>
+      </main>
+    </div>
 
     <script>
       // 由 Jinja2 注入的分析数据
@@ -385,15 +515,22 @@
           $(this).text(fmt(val));
         });
 
-        const charts = [];
-        const init = (id) => {
-          const el = document.getElementById(id);
-          if (!el) return null;
-          const c = echarts.init(el);
-          charts.push(c);
-          return c;
-        };
-        const baseGrid = { left: 8, right: 24, bottom: 8, top: 24, containLabel: true };
+        let charts = [];
+        let chartTheme = null;   // null = 亮色默认主题；"bha-dark" = 深色主题
+        let pieBorder = "#fff";  // 饼图扇区描边色，随主题切换
+
+        // 所有图表的构建集中在此，主题切换时整体重建。
+        function buildCharts() {
+          charts.forEach((c) => c && c.dispose());
+          charts = [];
+          const init = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const c = echarts.init(el, chartTheme);
+            charts.push(c);
+            return c;
+          };
+          const baseGrid = { left: 8, right: 44, bottom: 8, top: 28, containLabel: true };
 
         // ---- 类别饼图（按有效时长）----
         const cat = REPORT.categories;
@@ -406,8 +543,8 @@
             radius: ["42%", "70%"],
             center: ["50%", "44%"],
             avoidLabelOverlap: true,
-            itemStyle: { borderColor: "#fff", borderWidth: 2 },
-            label: { formatter: "{b}\n{d}%", fontSize: 11 },
+            itemStyle: { borderColor: pieBorder, borderWidth: 2 },
+            label: { formatter: "{b}\n{d}%", fontSize: 11, textBorderWidth: 0 },
             data: cat.names.map((n, i) => ({ name: n, value: cat.hours[i] })),
           }],
         });
@@ -439,7 +576,7 @@
             type: "bar",
             data: dv.counts.slice().reverse(),
             itemStyle: { color: "#4f46e5", borderRadius: [0, 6, 6, 0] },
-            label: { show: true, position: "right", fontSize: 10, formatter: (p) => fmt(p.value) },
+            label: { show: true, position: "right", fontSize: 10, textBorderWidth: 0, formatter: (p) => fmt(p.value) },
           }],
         });
 
@@ -454,7 +591,7 @@
             type: "bar",
             data: dh.hours.slice().reverse(),
             itemStyle: { color: "#06b6d4", borderRadius: [0, 6, 6, 0] },
-            label: { show: true, position: "right", fontSize: 10, formatter: "{c}" },
+            label: { show: true, position: "right", fontSize: 10, textBorderWidth: 0, formatter: "{c}" },
           }],
         });
 
@@ -490,12 +627,13 @@
         const hm = REPORT.heatmap;
         init("chart-heatmap").setOption({
           tooltip: { position: "top", formatter: (p) => `${hm.weekdays[p.value[1]]} ${p.value[0]}时<br/>${fmt(p.value[2])} 次` },
-          grid: { left: 8, right: 24, bottom: 36, top: 16, containLabel: true },
+          grid: { left: 8, right: 24, bottom: 84, top: 24, containLabel: true },
           xAxis: { type: "category", data: hm.hours, splitArea: { show: true } },
           yAxis: { type: "category", data: hm.weekdays, splitArea: { show: true } },
           visualMap: {
             min: 0, max: hm.max || 1, calculable: true,
-            orient: "horizontal", left: "center", bottom: 0,
+            orient: "horizontal", left: "center", bottom: 20,
+            itemWidth: 18, itemHeight: 160,
             inRange: { color: ["#e0f2fe", "#0284c7", "#1e3a8a"] },
           },
           series: [{
@@ -509,13 +647,13 @@
         init("chart-trend").setOption({
           tooltip: { trigger: "axis" },
           legend: { data: ["访问量", "有效时长(时)"], top: 0 },
-          grid: baseGrid,
+          grid: { left: 8, right: 24, bottom: 78, top: 40, containLabel: true },
           xAxis: { type: "category", boundaryGap: false, data: tr.dates },
           yAxis: [
             { type: "value", name: "访问量" },
             { type: "value", name: "时长(时)" },
           ],
-          dataZoom: [{ type: "inside" }, { type: "slider", height: 16, bottom: 0 }],
+          dataZoom: [{ type: "inside" }, { type: "slider", height: 24, bottom: 20 }],
           series: [
             { name: "访问量", type: "line", smooth: true, areaStyle: { opacity: 0.2 }, data: tr.counts, itemStyle: { color: "#4f46e5" } },
             { name: "有效时长(时)", type: "line", smooth: true, yAxisIndex: 1, data: tr.hours, itemStyle: { color: "#f59e0b" } },
@@ -542,8 +680,8 @@
           color: PALETTE,
           series: [{
             type: "pie", radius: ["35%", "65%"], center: ["50%", "50%"],
-            itemStyle: { borderColor: "#fff", borderWidth: 2 },
-            label: { fontSize: 10 },
+            itemStyle: { borderColor: pieBorder, borderWidth: 2 },
+            label: { fontSize: 10, textBorderWidth: 0 },
             data: REPORT.transitions.items,
           }],
         });
@@ -555,8 +693,8 @@
           color: ["#10b981", "#94a3b8"],
           series: [{
             type: "pie", radius: ["35%", "65%"], center: ["50%", "50%"],
-            itemStyle: { borderColor: "#fff", borderWidth: 2 },
-            label: { fontSize: 11 },
+            itemStyle: { borderColor: pieBorder, borderWidth: 2 },
+            label: { fontSize: 11, textBorderWidth: 0 },
             data: [
               { name: "直接访问/地址栏", value: ns.direct },
               { name: "页面内点击", value: ns.referred },
@@ -603,6 +741,68 @@
         } else {
           $("#chart-search").html('<div class="text-muted text-center pt-5">无搜索词记录</div>');
         }
+        } // end buildCharts
+
+        // ---- 深色 / 浅色主题 ----
+        // ECharts 6 默认会给文字加一圈白色描边(halo)，在纯色卡片上反而很丑、
+        // 可读性差。这里在主题层面统一关闭(textBorderWidth: 0)，并覆盖到每个
+        // 文字组件——坐标轴标签 / 图例 / 标题 / 视觉映射等。系列 label 另在各
+        // 图表单独关闭。
+        const noStroke = { textBorderColor: "transparent", textBorderWidth: 0 };
+        const makeTheme = (dark) => {
+          const ink = dark ? "#cbd5e1" : "#1e293b";
+          const axisCol = dark ? "#475569" : "#cbd5e1";
+          const split = dark ? "#1e293b" : "#eef2f7";
+          return {
+            backgroundColor: "transparent",
+            textStyle: { color: ink, ...noStroke },
+            title: { textStyle: { color: dark ? "#e2e8f0" : "#1e293b", ...noStroke } },
+            legend: { textStyle: { color: ink, ...noStroke } },
+            categoryAxis: {
+              axisLine: { lineStyle: { color: axisCol } },
+              axisTick: { lineStyle: { color: axisCol } },
+              axisLabel: { color: ink, ...noStroke },
+              nameTextStyle: { color: ink, ...noStroke },
+              splitLine: { lineStyle: { color: split } },
+              splitArea: dark
+                ? { areaStyle: { color: ["rgba(148,163,184,0.04)", "rgba(148,163,184,0.10)"] } }
+                : {},
+            },
+            valueAxis: {
+              axisLine: { lineStyle: { color: axisCol } },
+              axisTick: { lineStyle: { color: axisCol } },
+              axisLabel: { color: ink, ...noStroke },
+              nameTextStyle: { color: ink, ...noStroke },
+              splitLine: { lineStyle: { color: split } },
+            },
+            tooltip: dark
+              ? { backgroundColor: "rgba(15,23,42,0.94)", borderColor: "#334155", textStyle: { color: "#e2e8f0" } }
+              : {},
+            visualMap: { textStyle: { color: ink, ...noStroke } },
+          };
+        };
+        echarts.registerTheme("bha-light", makeTheme(false));
+        echarts.registerTheme("bha-dark", makeTheme(true));
+
+        function applyTheme(dark) {
+          document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+          chartTheme = dark ? "bha-dark" : "bha-light";
+          pieBorder = dark ? "#1e293b" : "#fff";
+          $("#theme-toggle").text(dark ? "☀️" : "🌙");
+          buildCharts();
+        }
+
+        const stored = localStorage.getItem("bha-theme");
+        const prefersDark =
+          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        let isDark = stored ? stored === "dark" : prefersDark;
+        applyTheme(isDark);
+
+        $("#theme-toggle").on("click", function () {
+          isDark = !isDark;
+          localStorage.setItem("bha-theme", isDark ? "dark" : "light");
+          applyTheme(isDark);
+        });
 
         // ---- 下载列表 ----
         const dls = REPORT.downloads.recent;
@@ -618,6 +818,31 @@
 
         // 自适应窗口大小
         $(window).on("resize", () => charts.forEach((c) => c && c.resize()));
+
+        // ---- 侧边栏导航高亮（scrollspy）----
+        const navLinks = $(".sidebar a.nav-link");
+        const sections = $("[data-section]").toArray();
+        const setActive = (id) => {
+          navLinks.removeClass("active");
+          navLinks.filter(`[href="#${id}"]`).addClass("active");
+        };
+        if (sections.length && "IntersectionObserver" in window) {
+          const visible = new Map();
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((e) => visible.set(e.target.id, e.intersectionRatio));
+              // 选出当前可见度最高的区块作为高亮项
+              let best = null, bestRatio = 0;
+              visible.forEach((ratio, id) => {
+                if (ratio > bestRatio) { bestRatio = ratio; best = id; }
+              });
+              if (best) setActive(best);
+            },
+            { rootMargin: "-10% 0px -70% 0px", threshold: [0, 0.25, 0.5, 1] }
+          );
+          sections.forEach((s) => observer.observe(s));
+          setActive(sections[0].id);
+        }
       });
     </script>
   </body>

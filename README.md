@@ -6,7 +6,7 @@
 
 - **输入流**：本地 SQLite3 数据库 (或通过 `-i` 参数指定)。
 - **处理流**：Python 读取纯净数据 -> `Polars` 进行高性能聚合与时序分析 -> 生成基于字典的图表数据。
-- **输出流**：`Jinja2` 注入数据 -> 结合 `ECharts` (CDN引入) 输出单文件 `index.html`。
+- **输出流**：`Jinja2` 注入数据 -> 结合 `Solid.js` + `ECharts` (CDN / ESM 引入) 输出单文件 `report.html`。
 
 ## 二、 模块划分与详细要求
 
@@ -49,13 +49,13 @@
 
 ### 4. 静态页面生成模块 (Jinja2 HTML Builder)
 
-- **模板设计**：`template.html` 文件预留 ECharts 所需的 `<div>` 图表容器和数据插槽。
-- **前端依赖引入**（全部通过 CDN，输出单文件无需本地资源）：
-  - ECharts 6：`<script src="https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.min.js"></script>`
-  - jQuery 4：`<script src="https://cdn.jsdelivr.net/npm/jquery@4/dist/jquery.min.js"></script>`
-  - Bootstrap 5：负责整体布局与卡片式 UI，让报告美观且自适应。
-  - TanStack Table（`@tanstack/table-core@8`，以 ESM 形式按需引入）：驱动「历史明细」全量表格的筛选 / 排序 / 分页 / 列宽拖拽，由原生 JS 渲染，无需打包构建。
-- **数据注入**：将 Polars 处理好的结果转换为 JSON 字符串，通过 Jinja2 注入到 HTML 的 `<script>` 标签内的 JavaScript 变量中，再由 jQuery 在 `ready` 后初始化各 ECharts 实例；明细表数据挂到 `window.REPORT` 供下方 ES module 读取。
+- **模板设计**：`template.html` 只预留一个 `<div id="app">` 挂载点，整页由 Solid.js 应用渲染；图表容器、KPI 卡片、明细表均为 Solid 组件动态生成。
+- **前端依赖引入**（全部走 `importmap` + ESM，无打包构建、输出单文件无需本地资源）：
+  - Solid.js（`solid-js@2.0.0-experimental.16` + `@solidjs/web` + `@solidjs/html`）：以 `html` 标签模板 + signals 驱动整个页面的响应式渲染（替代原 jQuery）。
+  - ECharts 6：**官方预构建的 `dist/echarts.esm.min.js`**（⚠️ 不能用 jsdelivr 的 `/+esm`，后者重打包会摇掉 canvas 绘制逻辑导致图表空白）。
+  - Bootstrap 5：仅以 CSS `<link>` 引入，负责整体布局与卡片式 UI。
+  - TanStack Table（`@tanstack/table-core@8`，框架无关核心）：驱动「历史明细」全量表格的筛选 / 排序 / 分页 / 列宽拖拽，通过一个 `tick` signal 桥接到 Solid 的响应式系统。
+- **数据注入**：将 Polars 处理好的结果转换为 JSON 字符串，通过 Jinja2 注入到 ES module 顶层的 `REPORT` 常量（模板里仅 `{{ chart_data | safe }}` 一处插槽，整个 `report` 字典已序列化，KPI / 图表 / 明细表共用同一份数据）。主题切换、侧栏 scrollspy 高亮等交互均由 Solid 的 `createSignal` / `createEffect` 管理。
 
 ## 三、 安装与使用
 
@@ -89,5 +89,5 @@ src/browser_history_analyzer/
 ├── analyzer.py        # Polars 数据清洗与聚合分析
 ├── builder.py         # Jinja2 渲染 HTML 报告
 └── templates/
-    └── template.html  # jQuery 4 + Bootstrap 5 + ECharts 6 + TanStack Table 模板
+    └── template.html  # Solid.js + Bootstrap 5 + ECharts 6 + TanStack Table（importmap + ESM）模板
 ```
